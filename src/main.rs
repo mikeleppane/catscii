@@ -1,4 +1,9 @@
-use pretty_hex::PrettyHex;
+use axum::body::BoxBody;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
+use axum::Router;
+use reqwest::StatusCode;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -8,6 +13,12 @@ struct CatImage {
 
 #[tokio::main]
 async fn main() {
+    let app = Router::new().route("/", get(root_get));
+
+    axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
     // let url = get_cat_image_url().await.unwrap();
     // println!("The image is at {}", url);
     //
@@ -16,8 +27,23 @@ async fn main() {
     // // onslaught. this will panic if the image has fewer than 200 bytes.
     // println!("{:?}", &image_bytes[..200].hex_dump());
 
-    let art = get_cat_ascii_art().await.unwrap();
-    println!("{art}");
+    //let art = get_cat_ascii_art().await.unwrap();
+    //println!("{art}");
+}
+
+async fn root_get() -> Response<BoxBody> {
+    match get_cat_ascii_art().await {
+        Ok(art) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+            art,
+        )
+            .into_response(),
+        Err(e) => {
+            println!("Something went wrong: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong").into_response()
+        }
+    }
 }
 
 async fn get_cat_ascii_art() -> color_eyre::Result<String> {
@@ -43,7 +69,12 @@ async fn get_cat_ascii_art() -> color_eyre::Result<String> {
         .await?;
 
     let image = image::load_from_memory(&image_bytes)?;
-    let ascii_art = artem::convert(image, artem::options::OptionBuilder::new().build());
+    let ascii_art = artem::convert(
+        image,
+        artem::options::OptionBuilder::new()
+            .target(artem::options::TargetType::HtmlFile(true, true))
+            .build(),
+    );
 
     Ok(ascii_art)
 }
