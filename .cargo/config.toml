@@ -8,6 +8,7 @@ rustflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=lld", "-C", "target-
 protocol = "sparse"
 
 [profile.release]
+debug = false
 lto = true
 strip = true
 codegen-units = 1

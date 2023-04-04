@@ -14,7 +14,7 @@ use opentelemetry::{
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
-use tracing::{info, Level};
+use tracing::{info, warn, Level};
 use tracing_subscriber::{filter::Targets, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Deserialize)]
@@ -41,12 +41,17 @@ async fn main() {
     let state = ServerState {
         client: Default::default(),
     };
+    let quit_sig = async {
+        _ = tokio::signal::ctrl_c().await;
+        warn!("Initiating graceful shutdown");
+    };
 
     let app = Router::new().route("/", get(root_get)).with_state(state);
     let addr = "0.0.0.0:8080".parse().unwrap();
     info!("Listening on {addr}");
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
+        .with_graceful_shutdown(quit_sig)
         .await
         .unwrap();
     // let url = get_cat_image_url().await.unwrap();
