@@ -10,7 +10,7 @@ FROM base AS builder
 RUN set -eux; \
     apt update; \
     apt upgrade -y; \
-    apt install --no-install-recommends lld clang curl ca-certificates -y
+    apt install --no-install-recommends lld clang curl ca-certificates libsqlite3-dev -y
 
 WORKDIR /app
 COPY src src
@@ -31,7 +31,7 @@ SHELL ["/bin/bash", "-c"]
 RUN set -eux; \
 	apt update; \
 	apt upgrade -y; \
-	apt install -y --no-install-recommends ca-certificates; \
+	apt install -y --no-install-recommends ca-certificates libsqlite3-0; \
 	apt clean autoclean; \
 	apt autoremove -y; \
 	rm -rf /var/lib/{apt,dpkg,cache,log}/

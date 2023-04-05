@@ -1,4 +1,6 @@
+use std::net::IpAddr;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use axum::body::BoxBody;
 use axum::extract::State;
@@ -17,6 +19,8 @@ use serde::Deserialize;
 use tracing::{info, warn, Level};
 use tracing_subscriber::{filter::Targets, layer::SubscriberExt, util::SubscriberInitExt};
 
+use locat::Locat;
+
 #[derive(Deserialize)]
 struct CatImage {
     url: String,
@@ -25,6 +29,7 @@ struct CatImage {
 #[derive(Clone)]
 struct ServerState {
     client: reqwest::Client,
+    locat: Arc<Locat>,
 }
 
 #[tokio::main]
@@ -40,6 +45,7 @@ async fn main() {
 
     let state = ServerState {
         client: Default::default(),
+        locat: Arc::new(Locat::new("todo_geoip_path.mmdb", "todo_analytics.db")),
     };
     let quit_sig = async {
         _ = tokio::signal::ctrl_c().await;
@@ -47,7 +53,8 @@ async fn main() {
     };
 
     let app = Router::new().route("/", get(root_get)).with_state(state);
-    let addr = "0.0.0.0:8080".parse().unwrap();
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_owned());
+    let addr = format!("0.0.0.0:{}", port).parse().unwrap();
     info!("Listening on {addr}");
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -66,9 +73,17 @@ async fn main() {
     //println!("{art}");
 }
 
+fn get_client_addr(headers: &HeaderMap) -> Option<IpAddr> {
+    let header = headers.get("fly-client-ip")?;
+    let header = header.to_str().ok()?;
+    let addr = header.parse::<IpAddr>().ok()?;
+    Some(addr)
+}
+
 async fn root_get(headers: HeaderMap, State(state): State<ServerState>) -> Response<BoxBody> {
     let tracer = global::tracer("");
     let mut span = tracer.start("root_get");
+    dbg!(&headers);
     span.set_attribute(KeyValue::new(
         "user_agent",
         headers
